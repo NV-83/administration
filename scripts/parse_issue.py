@@ -30,21 +30,25 @@ if not omschrijving:
 
 fmt = "%H:%M"
 
-# 1. Reguliere shift berekenen
+# 1. Reguliere shift in minuten
 t_start = datetime.strptime(start, fmt)
 t_eind = datetime.strptime(eind, fmt)
-bruto_dag = (t_eind - t_start).total_seconds() / 60
-netto_dag = (bruto_dag - pauze) / 60
+netto_dag_min = int((t_eind - t_start).total_seconds() / 60) - pauze
 
-# 2. Extra shift berekenen (indien ingevuld)
-netto_extra = 0.0
+# 2. Extra shift in minuten (indien aanwezig)
+netto_extra_min = 0
 if start_extra and eind_extra:
     t_start_ex = datetime.strptime(start_extra, fmt)
     t_eind_ex = datetime.strptime(eind_extra, fmt)
-    bruto_ex = (t_eind_ex - t_start_ex).total_seconds() / 60
-    netto_extra = (bruto_ex - pauze_extra) / 60
+    netto_extra_min = int((t_eind_ex - t_start_ex).total_seconds() / 60) - pauze_extra
 
-totale_netto_uren = round(netto_dag + netto_extra, 2)
+# 3. Totalen berekenen
+totale_minuten = max(0, netto_dag_min + netto_extra_min)
+uren = totale_minuten // 60
+minuten = totale_minuten % 60
+
+duur = f"{uren:02d}:{minuten:02d}"
+totale_netto_uren = round(totale_minuten / 60.0, 2)
 
 csv_path = "data/uren.csv"
 os.makedirs("data", exist_ok=True)
@@ -53,13 +57,13 @@ file_exists = os.path.isfile(csv_path)
 header = [
     "datum", "locatie", "start", "eind", "pauze_min",
     "start_extra", "eind_extra", "pauze_extra_min",
-    "netto_uren", "omschrijving"
+    "duur", "netto_uren", "omschrijving"
 ]
 
 row = [
     datum, locatie, start, eind, pauze,
     start_extra, eind_extra, (pauze_extra if start_extra else ""),
-    totale_netto_uren, omschrijving
+    duur, totale_netto_uren, omschrijving
 ]
 
 with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
