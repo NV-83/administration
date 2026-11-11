@@ -1,0 +1,64 @@
+{
+  "metadata": {
+    "klant": "waso",
+    "periode": "11-2026",
+    "factuur_nr": "01",
+    "tarief": 85.0,
+    "btw_pct": 21.0,
+    "datum_gegenereerd": "2026-11-11T20:04:55.750898"
+  },
+  "financieel": {
+    "totale_minuten": 1595,
+    "totale_duur_str": "26:35",
+    "totaal_uren": 26.58,
+    "thuis_uren": 11.0,
+    "kantoor_uren": 15.58,
+    "subtotaal": 2259.3,
+    "btw_bedrag": 474.45,
+    "totaal_incl": 2733.75
+  },
+  "prestaties": [
+    {
+      "datum": "2026-11-09",
+      "locatie": "Kantoor",
+      "start": "08:30",
+      "eind": "16:45",
+      "pauze_min": "30",
+      "locatie_extra": "",
+      "start_extra": "",
+      "eind_extra": "",
+      "pauze_extra_min": "",
+      "duur": "07:45",
+      "netto_uren": "7.75",
+      "omschrijving": "- ontvangst - installatie laptop (from scratch)  --> Issues met dnf <-> Red hat subscription"
+    },
+    {
+      "datum": "2026-11-10",
+      "locatie": "Kantoor",
+      "start": "07:30",
+      "eind": "15:50",
+      "pauze_min": "30",
+      "locatie_extra": "Thuis",
+      "start_extra": "20:00",
+      "eind_extra": "21:00",
+      "pauze_extra_min": "0",
+      "duur": "08:50",
+      "netto_uren": "8.83",
+      "omschrijving": "- Merge PR's git secrets - Update drivers - configuratie laptop - research hoe alles werkt - testen rechten + aanvragen ontbrekende"
+    },
+    {
+      "datum": "2026-11-11",
+      "locatie": "Thuis",
+      "start": "08:30",
+      "eind": "17:00",
+      "pauze_min": "30",
+      "locatie_extra": "Thuis",
+      "start_extra": "20:00",
+      "eind_extra": "22:00",
+      "pauze_extra_min": "0",
+      "duur": "10:00",
+      "netto_uren": "10",
+      "omschrijving": "dit is een test"
+    }
+  ]
+}
