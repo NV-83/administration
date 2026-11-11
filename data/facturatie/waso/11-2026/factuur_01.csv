@@ -1,4 +1,0 @@
-datum,locatie,start,eind,pauze_min,locatie_extra,start_extra,eind_extra,pauze_extra_min,duur,netto_uren,omschrijving
-2026-11-09,Kantoor,08:30,16:45,30,,,,,07:45,7.75,- ontvangst - installatie laptop (from scratch)  --> Issues met dnf <-> Red hat subscription
-2026-11-10,Kantoor,07:30,15:50,30,Thuis,20:00,21:00,0,08:50,8.83,- Merge PR's git secrets - Update drivers - configuratie laptop - research hoe alles werkt - testen rechten + aanvragen ontbrekende
-2026-11-11,Thuis,08:30,17:00,30,Thuis,20:00,22:00,0,10:00,10,dit is een test

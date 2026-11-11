@@ -32,13 +32,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Genereer factuurdossier
+      - name: Genereer factuurdossier (Dagtarief)
         id: generate
         env:
           KLANT_NAAM: ${{ github.event.inputs.klant || 'waso' }}
           TARGET_MONTH: ${{ github.event.inputs.maand }}
           MANUAL_FACTUUR_NR: ${{ github.event.inputs.factuur_nr }}
-          UURTARIEF: "85.00"
+          DAG_TARIEF: "650.00"
           BTW_TARIEF: "21"
         run: python scripts/generate_invoice.py
 

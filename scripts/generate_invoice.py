@@ -4,7 +4,7 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 CSV_INPUT_PATH = "data/uren.csv"
 BASE_FACTURATIE_DIR = "data/facturatie"
@@ -12,17 +12,17 @@ TIME_FORMAT = "%H:%M"
 
 
 def parse_environment() -> Tuple[str, float, float, str, str]:
-    """Leest en valideert de omgevingsvariabelen."""
+    """Leest configuratie uit omgevingsvariabelen."""
     klant = os.environ.get("KLANT_NAAM", "waso").strip().lower()
-    tarief = float(os.environ.get("UURTARIEF", "85.0"))
+    dagtarief = float(os.environ.get("DAG_TARIEF", "650.0"))
     btw_pct = float(os.environ.get("BTW_TARIEF", "21"))
     target_month = os.environ.get("TARGET_MONTH", "").strip()
     manual_factuur_nr = os.environ.get("MANUAL_FACTUUR_NR", "").strip()
-    return klant, tarief, btw_pct, target_month, manual_factuur_nr
+    return klant, dagtarief, btw_pct, target_month, manual_factuur_nr
 
 
 def determine_target_month(target_month_override: str) -> str:
-    """Bepaalt de doelmaand (JJJJ-MM). Standaard de voorgaande kalendermaand."""
+    """Bepaalt de doelmaand (JJJJ-MM). Standaard de voorbije maand."""
     if target_month_override:
         return target_month_override
 
@@ -34,11 +34,7 @@ def determine_target_month(target_month_override: str) -> str:
 
 
 def get_next_invoice_number(klant: str, manual_nr: str = "") -> str:
-    """
-    Bepaalt het volgende factuurnummer.
-    Scant data/facturatie/<klant>/** naar bestaande factuur_<nr> bestanden
-    en telt op met +1. Start op '01' indien geen historiek aanwezig is.
-    """
+    """Scant data/facturatie/<klant>/ en telt door met +1 (bijv. 01, 02)."""
     if manual_nr:
         return f"{int(manual_nr):02d}" if manual_nr.isdigit() else manual_nr
 
@@ -63,7 +59,7 @@ def get_next_invoice_number(klant: str, manual_nr: str = "") -> str:
 
 
 def load_monthly_records(csv_path: str, month_prefix: str) -> List[Dict[str, str]]:
-    """Laadt en filtert de rijen voor de gewenste maand uit de centrale CSV."""
+    """Laadt de registraties voor de gevraagde maand uit de CSV."""
     if not os.path.exists(csv_path):
         return []
 
@@ -76,108 +72,92 @@ def load_monthly_records(csv_path: str, month_prefix: str) -> List[Dict[str, str
     return records
 
 
-def calculate_shift_minutes(start_str: str, eind_str: str, pauze_str: str) -> int:
-    """Berekent netto minuten tussen twee tijdstippen minus pauze."""
-    try:
-        t1 = datetime.strptime(start_str, TIME_FORMAT)
-        t2 = datetime.strptime(eind_str, TIME_FORMAT)
-        pauze = int(pauze_str) if pauze_str and pauze_str.isdigit() else 0
-        return max(0, int((t2 - t1).total_seconds() / 60) - pauze)
-    except Exception:
-        return 0
-
-
-def calculate_financials(
-    records: List[Dict[str, str]], tarief: float, btw_pct: float
-) -> Dict[str, float]:
-    """Berekent urentotalen, opsplitsing thuis/kantoor en financiële bedragen."""
-    thuis_minuten = 0
-    kantoor_minuten = 0
+def calculate_days_and_financials(
+    records: List[Dict[str, str]], dagtarief: float, btw_pct: float
+) -> Tuple[List[Dict[str, str]], Dict[str, float]]:
+    """
+    Groepeert per unieke gewerkte kalenderdag en berekent de factuurtotalen
+    op basis van het dagtarief.
+    """
+    days_dict: Dict[str, Dict] = {}
 
     for r in records:
-        # Shift 1
-        s1_min = calculate_shift_minutes(r.get("start", ""), r.get("eind", ""), r.get("pauze_min", "0"))
-        if r.get("locatie") == "Thuis":
-            thuis_minuten += s1_min
+        d = r.get("datum")
+        if not d:
+            continue
+        if d not in days_dict:
+            days_dict[d] = {
+                "datum": d,
+                "status": "Gewerkt",
+                "uren": float(r.get("netto_uren", 0.0)),
+                "dagtarief": dagtarief
+            }
         else:
-            kantoor_minuten += s1_min
+            days_dict[d]["uren"] += float(r.get("netto_uren", 0.0))
 
-        # Shift 2 (extra)
-        if r.get("start_extra") and r.get("eind_extra"):
-            s2_min = calculate_shift_minutes(
-                r.get("start_extra", ""), r.get("eind_extra", ""), r.get("pauze_extra_min", "0")
-            )
-            loc2 = r.get("locatie_extra") or "Thuis"
-            if loc2 == "Thuis":
-                thuis_minuten += s2_min
-            else:
-                kantoor_minuten += s2_min
+    # Sorteren op datum
+    sorted_days = sorted(days_dict.values(), key=lambda x: x["datum"])
+    aantal_dagen = len(sorted_days)
 
-    totale_minuten = thuis_minuten + kantoor_minuten
-    totaal_uren = round(totale_minuten / 60.0, 2)
-    thuis_uren = round(thuis_minuten / 60.0, 2)
-    kantoor_uren = round(kantoor_minuten / 60.0, 2)
+    totale_uren = sum(d["uren"] for d in sorted_days)
+    gemiddelde_uren_dag = round(totale_uren / aantal_dagen, 2) if aantal_dagen > 0 else 0.0
 
-    subtotaal = round(totaal_uren * tarief, 2)
+    subtotaal = round(aantal_dagen * dagtarief, 2)
     btw_bedrag = round(subtotaal * (btw_pct / 100.0), 2)
     totaal_incl = round(subtotaal + btw_bedrag, 2)
 
-    return {
-        "totale_minuten": totale_minuten,
-        "totale_duur_str": f"{totale_minuten // 60:02d}:{totale_minuten % 60:02d}",
-        "totaal_uren": totaal_uren,
-        "thuis_uren": thuis_uren,
-        "kantoor_uren": kantoor_uren,
+    financials = {
+        "aantal_dagen": aantal_dagen,
+        "totale_uren": round(totale_uren, 2),
+        "gemiddelde_uren_dag": gemiddelde_uren_dag,
         "subtotaal": subtotaal,
         "btw_bedrag": btw_bedrag,
-        "totaal_incl": totaal_incl,
+        "totaal_incl": totaal_incl
     }
 
+    return sorted_days, financials
 
-def export_csv(filepath: str, records: List[Dict[str, str]]) -> None:
-    """Exporteert de gefilterde maanddata naar CSV."""
-    fieldnames = [
-        "datum", "locatie", "start", "eind", "pauze_min",
-        "locatie_extra", "start_extra", "eind_extra", "pauze_extra_min",
-        "duur", "netto_uren", "omschrijving"
-    ]
+
+def export_csv(filepath: str, billed_days: List[Dict[str, str]]) -> None:
+    """Exporteert het dagoverzicht naar CSV voor eventuele controle in Excel."""
+    fieldnames = ["datum", "status", "dagtarief", "uren_geregistreerd"]
     with open(filepath, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        for r in records:
-            writer.writerow({k: r.get(k, "") for k in fieldnames})
+        for d in billed_days:
+            writer.writerow({
+                "datum": d["datum"],
+                "status": d["status"],
+                "dagtarief": f"{d['dagtarief']:.2f}",
+                "uren_geregistreerd": f"{d['uren']:.2f}"
+            })
 
 
-def export_json(filepath: str, metadata: dict, financials: dict, records: List[dict]) -> None:
+def export_json(filepath: str, metadata: dict, financials: dict, billed_days: List[dict]) -> None:
     """Exporteert factuur- en prestatiemetadata naar JSON."""
     payload = {
         "metadata": metadata,
         "financieel": financials,
-        "prestaties": records,
+        "gefactureerde_dagen": billed_days
     }
     with open(filepath, mode="w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
 
 
-def export_html(filepath: str, metadata: dict, financials: dict, records: List[dict]) -> None:
-    """Genereert de printklare A4 HTML factuurbijlage."""
+def export_html(filepath: str, metadata: dict, financials: dict, billed_days: List[dict]) -> None:
+    """Genereert de cleane A4 factuurspecificatie."""
     table_rows = []
-    for r in records:
-        p1 = r.get("pauze_min", "0")
-        s1 = f"{r.get('start', '')} - {r.get('eind', '')}<br><small>({r.get('locatie', '')}, pauze: {p1}m)</small>"
-        s2 = "-"
-        if r.get("start_extra") and r.get("eind_extra"):
-            loc2 = r.get("locatie_extra") or "Thuis"
-            s2 = f"{r.get('start_extra')} - {r.get('eind_extra')}<br><small>({loc2})</small>"
+    for d in billed_days:
+        # Formatteer naar dag-maand (bijv. 09-11)
+        dt = datetime.strptime(d["datum"], "%Y-%m-%d")
+        datum_kort = dt.strftime("%d-%m")
+        datum_volledig = dt.strftime("%d-%m-%Y")
 
         table_rows.append(f"""
         <tr>
-          <td>{r.get('datum', '')}</td>
-          <td>{s1}</td>
-          <td>{s2}</td>
-          <td style="font-weight:600;">{r.get('duur', '-')}</td>
-          <td>{r.get('netto_uren', '0')}</td>
-          <td>{r.get('omschrijving', '-')}</td>
+          <td style="font-weight: 500;">{datum_volledig} ({datum_kort})</td>
+          <td><span class="badge">{d['status']}</span></td>
+          <td style="text-align: right;">€ {d['dagtarief']:,.2f}</td>
         </tr>
         """)
 
@@ -187,19 +167,21 @@ def export_html(filepath: str, metadata: dict, financials: dict, records: List[d
 <meta charset="utf-8">
 <title>Prestatiestaat {metadata['periode']} - {metadata['klant'].upper()}</title>
 <style>
-  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; color: #1e293b; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 35px; color: #0f172a; }}
   .header {{ display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 25px; }}
   .header h1 {{ margin: 0; font-size: 24px; color: #0f172a; }}
   .meta-box {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 25px; }}
-  .meta-box h3 {{ margin-top: 0; margin-bottom: 10px; font-size: 16px; color: #334155; }}
-  .meta-box p {{ margin: 4px 0; font-size: 14px; }}
-  table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }}
-  th, td {{ border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }}
-  th {{ background: #f1f5f9; color: #0f172a; }}
-  .totals {{ margin-top: 25px; float: right; width: 320px; }}
+  .meta-box h3 {{ margin-top: 0; margin-bottom: 10px; font-size: 15px; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }}
+  .meta-box p {{ margin: 5px 0; font-size: 14px; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }}
+  th, td {{ border: 1px solid #cbd5e1; padding: 10px 14px; text-align: left; }}
+  th {{ background: #f1f5f9; color: #0f172a; font-weight: 600; }}
+  .badge {{ background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: 500; font-size: 13px; }}
+  .totals {{ margin-top: 25px; float: right; width: 340px; }}
   .totals table {{ border: none; font-size: 14px; }}
   .totals td {{ border: none; padding: 6px; }}
   .grand-total {{ font-weight: bold; font-size: 16px; border-top: 2px solid #0f172a !important; color: #0f172a; }}
+  .info-note {{ margin-top: 50px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px; }}
   @media print {{ body {{ margin: 10mm; }} }}
 </style>
 </head>
@@ -217,16 +199,14 @@ def export_html(filepath: str, metadata: dict, financials: dict, records: List[d
 
   <div class="meta-box">
     <div>
-      <h3>Urenoverzicht</h3>
-      <p><strong>Totaal gewerkt:</strong> {financials['totale_duur_str']} ({financials['totaal_uren']:.2f} uur)</p>
-      <p><strong>Kantoor / On-site:</strong> {financials['kantoor_uren']:.2f} uur</p>
-      <p><strong>Thuiswerk:</strong> {financials['thuis_uren']:.2f} uur</p>
+      <h3>Prestatieoverzicht</h3>
+      <p><strong>Aantal gefactureerde dagen:</strong> {financials['aantal_dagen']} dagen</p>
+      <p><strong>Vast dagtarief:</strong> € {metadata['dagtarief']:,.2f}</p>
     </div>
     <div>
-      <h3>Facturatieparameters</h3>
-      <p><strong>Uurtarief:</strong> € {metadata['tarief']:,.2f}</p>
+      <h3>Facturatiegegevens</h3>
       <p><strong>Btw-tarief:</strong> {int(metadata['btw_pct'])}%</p>
-      <p><strong>Status:</strong> Facturatieklaar</p>
+      <p><strong>Referentie:</strong> {metadata['periode']}-{metadata['factuur_nr']}</p>
     </div>
   </div>
 
@@ -234,11 +214,8 @@ def export_html(filepath: str, metadata: dict, financials: dict, records: List[d
     <thead>
       <tr>
         <th>Datum</th>
-        <th>Shift 1</th>
-        <th>Shift 2 (extra)</th>
-        <th>Duur</th>
-        <th>Uur</th>
-        <th>Omschrijving</th>
+        <th>Status</th>
+        <th style="text-align: right;">Bedrag</th>
       </tr>
     </thead>
     <tbody>
@@ -249,7 +226,7 @@ def export_html(filepath: str, metadata: dict, financials: dict, records: List[d
   <div class="totals">
     <table>
       <tr>
-        <td>Subtotaal (excl. btw):</td>
+        <td>Subtotaal ({financials['aantal_dagen']} dagen excl. btw):</td>
         <td style="text-align: right;">€ {financials['subtotaal']:,.2f}</td>
       </tr>
       <tr>
@@ -262,6 +239,12 @@ def export_html(filepath: str, metadata: dict, financials: dict, records: List[d
       </tr>
     </table>
   </div>
+
+  <div style="clear: both;"></div>
+
+  <div class="info-note">
+    <em>Interne urencontrole ter verantwoording: {financials['totale_uren']} uur geregistreerd over {financials['aantal_dagen']} werkdagen (gemiddeld {financials['gemiddelde_uren_dag']} uur/dag).</em>
+  </div>
 </body>
 </html>
 """
@@ -269,16 +252,26 @@ def export_html(filepath: str, metadata: dict, financials: dict, records: List[d
         f.write(html_content)
 
 
-def emit_github_outputs(metadata: dict, financials: dict, output_dir: str) -> None:
-    """Communiceert de resultaten terug naar GitHub Actions Job Summary en GITHUB_OUTPUT."""
+def emit_github_outputs(metadata: dict, financials: dict, output_dir: str, billed_days: List[dict]) -> None:
+    """Toont het resultaat in GitHub Actions Summary en zet outputs voor de workflow."""
+    lines_summary = []
+    for d in billed_days:
+        dt = datetime.strptime(d["datum"], "%Y-%m-%d")
+        lines_summary.append(f"- **{dt.strftime('%d-%m')}:** {d['status']} (€ {d['dagtarief']:,.2f})")
+
     summary_md = f"""# Factuurdossier Gegenereerd: {metadata['klant'].upper()} ({metadata['periode']})
 
 - **Factuurnummer:** `factuur_{metadata['factuur_nr']}`
 - **Locatie:** `{output_dir}/`
-- **Totaal prestatie:** {financials['totale_duur_str']} ({financials['totaal_uren']:.2f} uur)
+- **Dagen gewerkt:** {financials['aantal_dagen']} dagen (€ {metadata['dagtarief']:,.2f}/dag)
 - **Subtotaal:** € {financials['subtotaal']:,.2f} | **Btw ({int(metadata['btw_pct'])}%):** € {financials['btw_bedrag']:,.2f} | **Totaal incl. btw:** € {financials['totaal_incl']:,.2f}
 
-**Aangemaakte bestanden:**
+### Gewerkte Dagen:
+{chr(10).join(lines_summary)}
+
+> *Uren ter verantwoording: {financials['totale_uren']} uur geregistreerd (gemiddeld {financials['gemiddelde_uren_dag']} u/dag).*
+
+**Bestanden in dossier:**
 - `factuur_{metadata['factuur_nr']}.html`
 - `factuur_{metadata['factuur_nr']}.json`
 - `factuur_{metadata['factuur_nr']}.csv`
@@ -296,11 +289,11 @@ def emit_github_outputs(metadata: dict, financials: dict, output_dir: str) -> No
 
 
 def main() -> None:
-    klant, tarief, btw_pct, target_month_env, manual_nr = parse_environment()
+    klant, dagtarief, btw_pct, target_month_env, manual_nr = parse_environment()
     month_prefix = determine_target_month(target_month_env)
     records = load_monthly_records(CSV_INPUT_PATH, month_prefix)
 
-    # Fallback bij testen: als de berekende doelmaand leeg is, probeer huidige maand
+    # Fallback bij testen indien doelmaand leeg is
     if not records and not target_month_env:
         current_month = datetime.now().strftime("%Y-%m")
         records = load_monthly_records(CSV_INPUT_PATH, current_month)
@@ -314,23 +307,24 @@ def main() -> None:
     output_dir = os.path.join(BASE_FACTURATIE_DIR, klant, folder_periode)
     os.makedirs(output_dir, exist_ok=True)
 
-    financials = calculate_financials(records, tarief, btw_pct)
+    billed_days, financials = calculate_days_and_financials(records, dagtarief, btw_pct)
+
     metadata = {
         "klant": klant,
         "periode": folder_periode,
         "factuur_nr": factuur_nr,
-        "tarief": tarief,
+        "dagtarief": dagtarief,
         "btw_pct": btw_pct,
         "datum_gegenereerd": datetime.now().isoformat(),
     }
 
     base_path = os.path.join(output_dir, f"factuur_{factuur_nr}")
-    export_csv(f"{base_path}.csv", records)
-    export_json(f"{base_path}.json", metadata, financials, records)
-    export_html(f"{base_path}.html", metadata, financials, records)
+    export_csv(f"{base_path}.csv", billed_days)
+    export_json(f"{base_path}.json", metadata, financials, billed_days)
+    export_html(f"{base_path}.html", metadata, financials, billed_days)
 
-    emit_github_outputs(metadata, financials, output_dir)
-    print(f"Factuur #{factuur_nr} succesvol aangemaakt in {output_dir}")
+    emit_github_outputs(metadata, financials, output_dir, billed_days)
+    print(f"Factuur #{factuur_nr} succesvol gegenereerd: {financials['aantal_dagen']} dagen.")
 
 
 if __name__ == "__main__":
