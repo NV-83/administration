@@ -1,6 +1,6 @@
 name: Werkdag registreren
 description: Registreer gewerkte uren, pauze en werklocatie.
-title: "Tijdsregistratie"
+title: "Tijdsregistratie: "
 labels: ["tijdsregistratie"]
 body:
   - type: input
@@ -10,6 +10,7 @@ body:
       description: Formaat JJJJ-MM-DD (bijv. 2026-11-11)
     validations:
       required: true
+
   - type: dropdown
     id: locatie
     attributes:
@@ -20,6 +21,7 @@ body:
         - Klant op locatie
     validations:
       required: true
+
   - type: input
     id: start
     attributes:
@@ -27,6 +29,7 @@ body:
       placeholder: "08:30"
     validations:
       required: true
+
   - type: input
     id: eind
     attributes:
@@ -34,6 +37,7 @@ body:
       placeholder: "17:00"
     validations:
       required: true
+
   - type: input
     id: pauze
     attributes:
@@ -41,6 +45,31 @@ body:
       placeholder: "30"
     validations:
       required: true
+
+  - type: input
+    id: start_extra
+    attributes:
+      label: Startuur extra (optioneel)
+      placeholder: "20:00"
+    validations:
+      required: false
+
+  - type: input
+    id: eind_extra
+    attributes:
+      label: Einduur extra (optioneel)
+      placeholder: "22:00"
+    validations:
+      required: false
+
+  - type: input
+    id: pauze_extra
+    attributes:
+      label: Pauze extra (minuten, optioneel)
+      placeholder: "0"
+    validations:
+      required: false
+
   - type: textarea
     id: omschrijving
     attributes:
