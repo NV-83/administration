@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   parse-and-log:
-    if: contains(github.event.issue.labels.*.name, 'tijdregistratie')
+    if: contains(github.event.issue.labels.*.name, 'tijdsregistratie')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

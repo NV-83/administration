@@ -1,7 +1,7 @@
 name: Werkdag registreren
 description: Registreer gewerkte uren, pauze en werklocatie.
-title: "[Log] "
-labels: ["tijdregistratie"]
+title: "Tijdsregistratie"
+labels: ["tijdsregistratie"]
 body:
   - type: input
     id: datum
