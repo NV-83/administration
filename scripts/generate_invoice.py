@@ -8,21 +8,26 @@ from typing import Dict, List, Tuple
 
 CSV_INPUT_PATH = "data/uren.csv"
 BASE_FACTURATIE_DIR = "data/facturatie"
-TIME_FORMAT = "%H:%M"
+
+# Klanten-mapping: korte sleutel naar officiële weergavenaam
+KLANTEN_MAPPING = {
+    "waso": "FOD Werkgelegenheid, Arbeid en Sociaal Overleg",
+}
 
 
-def parse_environment() -> Tuple[str, float, float, str, str]:
+def parse_environment() -> Tuple[str, str, float, float, str, str]:
     """Leest configuratie uit omgevingsvariabelen."""
-    klant = os.environ.get("KLANT_NAAM", "waso").strip().lower()
+    klant_key = os.environ.get("KLANT_NAAM", "waso").strip().lower()
+    klant_naam_voluit = KLANTEN_MAPPING.get(klant_key, klant_key.upper())
     dagtarief = float(os.environ.get("DAG_TARIEF", "650.0"))
     btw_pct = float(os.environ.get("BTW_TARIEF", "21"))
     target_month = os.environ.get("TARGET_MONTH", "").strip()
     manual_factuur_nr = os.environ.get("MANUAL_FACTUUR_NR", "").strip()
-    return klant, dagtarief, btw_pct, target_month, manual_factuur_nr
+    return klant_key, klant_naam_voluit, dagtarief, btw_pct, target_month, manual_factuur_nr
 
 
 def determine_target_month(target_month_override: str) -> str:
-    """Bepaalt de doelmaand (JJJJ-MM). Standaard de voorbije maand."""
+    """Bepaalt de doelmaand (JJJJ-MM). Standaard de voorgaande kalendermaand."""
     if target_month_override:
         return target_month_override
 
@@ -33,14 +38,17 @@ def determine_target_month(target_month_override: str) -> str:
     return f"{jaar}-{maand:02d}"
 
 
-def get_next_invoice_number(klant: str, manual_nr: str = "") -> str:
-    """Scant data/facturatie/<klant>/ en telt door met +1 (bijv. 01, 02)."""
+def get_next_invoice_number(klant_key: str, manual_nr: str = "") -> str:
+    """
+    Bepaalt het volgende volgnummer met 3 cijfers (bijv. '001', '002').
+    Scant data/facturatie/<klant>/** naar bestaande bestanden.
+    """
     if manual_nr:
-        return f"{int(manual_nr):02d}" if manual_nr.isdigit() else manual_nr
+        return f"{int(manual_nr):03d}" if manual_nr.isdigit() else manual_nr
 
-    klant_dir = os.path.join(BASE_FACTURATIE_DIR, klant)
+    klant_dir = os.path.join(BASE_FACTURATIE_DIR, klant_key)
     if not os.path.exists(klant_dir):
-        return "01"
+        return "001"
 
     found_numbers = []
     pattern = re.compile(r"factuur_(\d+)\.(html|json|csv)$")
@@ -52,14 +60,14 @@ def get_next_invoice_number(klant: str, manual_nr: str = "") -> str:
                 found_numbers.append(int(match.group(1)))
 
     if not found_numbers:
-        return "01"
+        return "001"
 
     next_val = max(found_numbers) + 1
-    return f"{next_val:02d}"
+    return f"{next_val:03d}"
 
 
 def load_monthly_records(csv_path: str, month_prefix: str) -> List[Dict[str, str]]:
-    """Laadt de registraties voor de gevraagde maand uit de CSV."""
+    """Laadt de registraties voor de gevraagde maand uit de centrale CSV."""
     if not os.path.exists(csv_path):
         return []
 
@@ -75,10 +83,7 @@ def load_monthly_records(csv_path: str, month_prefix: str) -> List[Dict[str, str
 def calculate_days_and_financials(
     records: List[Dict[str, str]], dagtarief: float, btw_pct: float
 ) -> Tuple[List[Dict[str, str]], Dict[str, float]]:
-    """
-    Groepeert per unieke gewerkte kalenderdag en berekent de factuurtotalen
-    op basis van het dagtarief.
-    """
+    """Groepeert per unieke gewerkte kalenderdag en berekent de factuurtotalen."""
     days_dict: Dict[str, Dict] = {}
 
     for r in records:
@@ -89,18 +94,11 @@ def calculate_days_and_financials(
             days_dict[d] = {
                 "datum": d,
                 "status": "Gewerkt",
-                "uren": float(r.get("netto_uren", 0.0)),
                 "dagtarief": dagtarief
             }
-        else:
-            days_dict[d]["uren"] += float(r.get("netto_uren", 0.0))
 
-    # Sorteren op datum
     sorted_days = sorted(days_dict.values(), key=lambda x: x["datum"])
     aantal_dagen = len(sorted_days)
-
-    totale_uren = sum(d["uren"] for d in sorted_days)
-    gemiddelde_uren_dag = round(totale_uren / aantal_dagen, 2) if aantal_dagen > 0 else 0.0
 
     subtotaal = round(aantal_dagen * dagtarief, 2)
     btw_bedrag = round(subtotaal * (btw_pct / 100.0), 2)
@@ -108,8 +106,6 @@ def calculate_days_and_financials(
 
     financials = {
         "aantal_dagen": aantal_dagen,
-        "totale_uren": round(totale_uren, 2),
-        "gemiddelde_uren_dag": gemiddelde_uren_dag,
         "subtotaal": subtotaal,
         "btw_bedrag": btw_bedrag,
         "totaal_incl": totaal_incl
@@ -119,8 +115,8 @@ def calculate_days_and_financials(
 
 
 def export_csv(filepath: str, billed_days: List[Dict[str, str]]) -> None:
-    """Exporteert het dagoverzicht naar CSV voor eventuele controle in Excel."""
-    fieldnames = ["datum", "status", "dagtarief", "uren_geregistreerd"]
+    """Exporteert het dagoverzicht naar CSV."""
+    fieldnames = ["datum", "status", "dagtarief"]
     with open(filepath, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -128,13 +124,12 @@ def export_csv(filepath: str, billed_days: List[Dict[str, str]]) -> None:
             writer.writerow({
                 "datum": d["datum"],
                 "status": d["status"],
-                "dagtarief": f"{d['dagtarief']:.2f}",
-                "uren_geregistreerd": f"{d['uren']:.2f}"
+                "dagtarief": f"{d['dagtarief']:.2f}"
             })
 
 
 def export_json(filepath: str, metadata: dict, financials: dict, billed_days: List[dict]) -> None:
-    """Exporteert factuur- en prestatiemetadata naar JSON."""
+    """Exporteert factuurmetadata naar JSON."""
     payload = {
         "metadata": metadata,
         "financieel": financials,
@@ -148,7 +143,6 @@ def export_html(filepath: str, metadata: dict, financials: dict, billed_days: Li
     """Genereert de cleane A4 factuurspecificatie."""
     table_rows = []
     for d in billed_days:
-        # Formatteer naar dag-maand (bijv. 09-11)
         dt = datetime.strptime(d["datum"], "%Y-%m-%d")
         datum_kort = dt.strftime("%d-%m")
         datum_volledig = dt.strftime("%d-%m-%Y")
@@ -165,7 +159,7 @@ def export_html(filepath: str, metadata: dict, financials: dict, billed_days: Li
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<title>Prestatiestaat {metadata['periode']} - {metadata['klant'].upper()}</title>
+<title>Prestatiestaat {metadata['periode']} - {metadata['klant_voluit']}</title>
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 35px; color: #0f172a; }}
   .header {{ display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 25px; }}
@@ -181,7 +175,6 @@ def export_html(filepath: str, metadata: dict, financials: dict, billed_days: Li
   .totals table {{ border: none; font-size: 14px; }}
   .totals td {{ border: none; padding: 6px; }}
   .grand-total {{ font-weight: bold; font-size: 16px; border-top: 2px solid #0f172a !important; color: #0f172a; }}
-  .info-note {{ margin-top: 50px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px; }}
   @media print {{ body {{ margin: 10mm; }} }}
 </style>
 </head>
@@ -189,7 +182,8 @@ def export_html(filepath: str, metadata: dict, financials: dict, billed_days: Li
   <div class="header">
     <div>
       <h1>Prestatiestaat & Factuurbijlage</h1>
-      <p style="margin: 5px 0 0 0; color: #64748b;">Klant: {metadata['klant'].upper()} | Periode: {metadata['periode']} | Factuur #{metadata['factuur_nr']}</p>
+      <p style="margin: 5px 0 0 0; color: #64748b;">Klant: {metadata['klant_voluit']}</p>
+      <p style="margin: 2px 0 0 0; color: #64748b;">Periode: {metadata['periode']} | Referentie: <strong>{metadata['referentie']}</strong></p>
     </div>
     <div style="text-align: right;">
       <h2 style="margin: 0; font-size: 20px; color: #0f172a;">NV-83</h2>
@@ -206,7 +200,7 @@ def export_html(filepath: str, metadata: dict, financials: dict, billed_days: Li
     <div>
       <h3>Facturatiegegevens</h3>
       <p><strong>Btw-tarief:</strong> {int(metadata['btw_pct'])}%</p>
-      <p><strong>Referentie:</strong> {metadata['periode']}-{metadata['factuur_nr']}</p>
+      <p><strong>Factuurnummer:</strong> {metadata['referentie']}</p>
     </div>
   </div>
 
@@ -239,12 +233,6 @@ def export_html(filepath: str, metadata: dict, financials: dict, billed_days: Li
       </tr>
     </table>
   </div>
-
-  <div style="clear: both;"></div>
-
-  <div class="info-note">
-    <em>Interne urencontrole ter verantwoording: {financials['totale_uren']} uur geregistreerd over {financials['aantal_dagen']} werkdagen (gemiddeld {financials['gemiddelde_uren_dag']} uur/dag).</em>
-  </div>
 </body>
 </html>
 """
@@ -253,25 +241,23 @@ def export_html(filepath: str, metadata: dict, financials: dict, billed_days: Li
 
 
 def emit_github_outputs(metadata: dict, financials: dict, output_dir: str, billed_days: List[dict]) -> None:
-    """Toont het resultaat in GitHub Actions Summary en zet outputs voor de workflow."""
+    """Rapporteert naar de GitHub Actions Summary."""
     lines_summary = []
     for d in billed_days:
         dt = datetime.strptime(d["datum"], "%Y-%m-%d")
         lines_summary.append(f"- **{dt.strftime('%d-%m')}:** {d['status']} (€ {d['dagtarief']:,.2f})")
 
-    summary_md = f"""# Factuurdossier Gegenereerd: {metadata['klant'].upper()} ({metadata['periode']})
+    summary_md = f"""# Factuurdossier Gegenereerd: {metadata['klant_voluit']} ({metadata['periode']})
 
-- **Factuurnummer:** `factuur_{metadata['factuur_nr']}`
-- **Locatie:** `{output_dir}/`
+- **Referentie / Factuurnr:** `{metadata['referentie']}`
+- **Locatie in repo:** `{output_dir}/`
 - **Dagen gewerkt:** {financials['aantal_dagen']} dagen (€ {metadata['dagtarief']:,.2f}/dag)
 - **Subtotaal:** € {financials['subtotaal']:,.2f} | **Btw ({int(metadata['btw_pct'])}%):** € {financials['btw_bedrag']:,.2f} | **Totaal incl. btw:** € {financials['totaal_incl']:,.2f}
 
 ### Gewerkte Dagen:
 {chr(10).join(lines_summary)}
 
-> *Uren ter verantwoording: {financials['totale_uren']} uur geregistreerd (gemiddeld {financials['gemiddelde_uren_dag']} u/dag).*
-
-**Bestanden in dossier:**
+**Aangemaakte bestanden:**
 - `factuur_{metadata['factuur_nr']}.html`
 - `factuur_{metadata['factuur_nr']}.json`
 - `factuur_{metadata['factuur_nr']}.csv`
@@ -282,14 +268,14 @@ def emit_github_outputs(metadata: dict, financials: dict, output_dir: str, bille
 
     if "GITHUB_OUTPUT" in os.environ:
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-            f.write(f"klant={metadata['klant']}\n")
+            f.write(f"klant={metadata['klant_key']}\n")
             f.write(f"factuur_nr={metadata['factuur_nr']}\n")
             f.write(f"periode={metadata['periode']}\n")
             f.write(f"output_dir={output_dir}\n")
 
 
 def main() -> None:
-    klant, dagtarief, btw_pct, target_month_env, manual_nr = parse_environment()
+    klant_key, klant_naam_voluit, dagtarief, btw_pct, target_month_env, manual_nr = parse_environment()
     month_prefix = determine_target_month(target_month_env)
     records = load_monthly_records(CSV_INPUT_PATH, month_prefix)
 
@@ -300,19 +286,24 @@ def main() -> None:
         if records:
             month_prefix = current_month
 
-    factuur_nr = get_next_invoice_number(klant, manual_nr)
+    factuur_nr = get_next_invoice_number(klant_key, manual_nr)
     jaar_str, maand_str = month_prefix.split("-")
     folder_periode = f"{maand_str}-{jaar_str}"
+    
+    # Eenduidige referentie: bijv. 2026-001
+    referentie = f"NV83-{jaar_str}-{factuur_nr}"
 
-    output_dir = os.path.join(BASE_FACTURATIE_DIR, klant, folder_periode)
+    output_dir = os.path.join(BASE_FACTURATIE_DIR, klant_key, folder_periode)
     os.makedirs(output_dir, exist_ok=True)
 
     billed_days, financials = calculate_days_and_financials(records, dagtarief, btw_pct)
 
     metadata = {
-        "klant": klant,
+        "klant_key": klant_key,
+        "klant_voluit": klant_naam_voluit,
         "periode": folder_periode,
         "factuur_nr": factuur_nr,
+        "referentie": referentie,
         "dagtarief": dagtarief,
         "btw_pct": btw_pct,
         "datum_gegenereerd": datetime.now().isoformat(),
@@ -324,7 +315,7 @@ def main() -> None:
     export_html(f"{base_path}.html", metadata, financials, billed_days)
 
     emit_github_outputs(metadata, financials, output_dir, billed_days)
-    print(f"Factuur #{factuur_nr} succesvol gegenereerd: {financials['aantal_dagen']} dagen.")
+    print(f"Factuur {referentie} ({metadata['klant_voluit']}) succesvol aangemaakt.")
 
 
 if __name__ == "__main__":
