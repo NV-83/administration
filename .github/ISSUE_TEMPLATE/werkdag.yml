@@ -46,4 +46,4 @@ body:
     attributes:
       label: Omschrijving werkzaamheden
     validations:
-      required: true
+      required: false
