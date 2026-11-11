@@ -4,7 +4,7 @@ import os
 
 os.makedirs("output", exist_ok=True)
 vandaag = datetime.now().date()
-maandag = vandaag - timedelta(days=vandaag.weekday()) # Maandag van de huidige week
+maandag = vandaag - timedelta(days=vandaag.weekday())  # Maandag van de huidige week
 
 rows = []
 if os.path.exists("data/uren.csv"):
@@ -18,9 +18,9 @@ if os.path.exists("data/uren.csv"):
                 rows.append(r)
 
 # Totalen berekenen
-totaal_uren = sum(float(r["netto_uren"]) for r in rows)
-thuis_uren = sum(float(r["netto_uren"]) for r in rows if r["locatie"] == "Thuis")
-kantoor_uren = sum(float(r["netto_uren"]) for r in rows if r["locatie"] != "Thuis")
+totaal_uren = sum(float(r["netto_uren"]) for r in rows if r.get("netto_uren"))
+thuis_uren = sum(float(r["netto_uren"]) for r in rows if r.get("locatie") == "Thuis" and r.get("netto_uren"))
+kantoor_uren = sum(float(r["netto_uren"]) for r in rows if r.get("locatie") != "Thuis" and r.get("netto_uren"))
 
 # Totale tijd omzetten naar UU:MM
 totale_minuten = sum(
@@ -36,7 +36,8 @@ md += "| Datum | Locatie | Shift 1 | Shift 2 (extra) | Duur | Netto Uur | Omschr
 md += "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
 
 for r in rows:
-    shift1 = f"{r['start']}-{r['eind']} (p: {r['pauze_min']}m)"
+    pauze_1 = r.get("pauze_min", "0")
+    shift1 = f"{r['start']}-{r['eind']} (p: {pauze_1}m)"
     shift2 = "-"
     if r.get("start_extra") and r.get("eind_extra"):
         shift2 = f"{r['start_extra']}-{r['eind_extra']}"
@@ -45,10 +46,14 @@ for r in rows:
             shift2 += f" (p: {p_extra}m)"
             
     duur_val = r.get("duur", "-")
-    md += f"| {r['datum']} | {r['locatie']} | {shift1} | {shift2} | **{duur_val}** | {r['netto_uren']} | {r['omschrijving']} |\n"
+    netto_val = r.get("netto_uren", "0")
+    omschr = r.get("omschrijving", "-")
+    md += f"| {r['datum']} | {r['locatie']} | {shift1} | {shift2} | **{duur_val}** | {netto_val} | {omschr} |\n"
 
 with open("output/timesheet_week.md", "w", encoding="utf-8") as f:
     f.write(md)
 
-# Direct tonen in GitHub Actions UI
-if "GITHUB_STEP
+# Direct tonen in GitHub Actions Summary
+if "GITHUB_STEP_SUMMARY" in os.environ:
+    with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+        f.write(md)
