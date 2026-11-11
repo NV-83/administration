@@ -1,6 +1,6 @@
 name: Werkdag registreren
 description: Registreer gewerkte uren, pauze en werklocatie.
-title: "Tijdsregistratie: "
+title: "Tijdsregistratie"
 labels: ["tijdsregistratie"]
 assignees:
   - V3rmeulen
