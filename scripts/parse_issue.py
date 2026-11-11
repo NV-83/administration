@@ -38,19 +38,11 @@ netto_dag = (bruto_dag - pauze) / 60
 
 # 2. Extra shift berekenen (indien ingevuld)
 netto_extra = 0.0
-start_display = start
-eind_display = eind
-totale_pauze = pauze
-
 if start_extra and eind_extra:
     t_start_ex = datetime.strptime(start_extra, fmt)
     t_eind_ex = datetime.strptime(eind_extra, fmt)
     bruto_ex = (t_eind_ex - t_start_ex).total_seconds() / 60
     netto_extra = (bruto_ex - pauze_extra) / 60
-
-    start_display = f"{start} + {start_extra}"
-    eind_display = f"{eind} + {eind_extra}"
-    totale_pauze += pauze_extra
 
 totale_netto_uren = round(netto_dag + netto_extra, 2)
 
@@ -58,8 +50,20 @@ csv_path = "data/uren.csv"
 os.makedirs("data", exist_ok=True)
 file_exists = os.path.isfile(csv_path)
 
+header = [
+    "datum", "locatie", "start", "eind", "pauze_min",
+    "start_extra", "eind_extra", "pauze_extra_min",
+    "netto_uren", "omschrijving"
+]
+
+row = [
+    datum, locatie, start, eind, pauze,
+    start_extra, eind_extra, (pauze_extra if start_extra else ""),
+    totale_netto_uren, omschrijving
+]
+
 with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
     if not file_exists:
-        writer.writerow(["datum", "locatie", "start", "eind", "pauze_min", "netto_uren", "omschrijving"])
-    writer.writerow([datum, locatie, start_display, eind_display, totale_pauze, totale_netto_uren, omschrijving])
+        writer.writerow(header)
+    writer.writerow(row)
