@@ -1,6 +1,6 @@
 name: Werkdag registreren
 description: Registreer gewerkte uren, pauze en werklocatie.
-title: "Tijdsregistratie"
+title: "Tijdsregistratie: "
 labels: ["tijdsregistratie"]
 assignees:
   - V3rmeulen
@@ -69,6 +69,18 @@ body:
     attributes:
       label: Pauze extra (minuten, optioneel)
       placeholder: "0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: locatie_extra
+    attributes:
+      label: Locatie extra (optioneel)
+      options:
+        - "-"
+        - Thuis
+        - Kantoor
+        - Klant op locatie
     validations:
       required: false
 

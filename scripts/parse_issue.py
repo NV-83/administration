@@ -24,6 +24,14 @@ eind_extra = extract("Einduur extra (optioneel)")
 pauze_extra_raw = extract("Pauze extra (minuten, optioneel)")
 pauze_extra = int(pauze_extra_raw) if (pauze_extra_raw and pauze_extra_raw.isdigit()) else 0
 
+locatie_extra = extract("Locatie extra (optioneel)")
+if locatie_extra in ["-", "_no response_", "none"]:
+    locatie_extra = ""
+
+# Als er een extra shift is maar geen afwijkende locatie gekozen, standaard Thuis
+if start_extra and eind_extra and not locatie_extra:
+    locatie_extra = "Thuis"
+
 omschrijving = extract("Omschrijving werkzaamheden").replace("\n", " ").strip()
 if not omschrijving:
     omschrijving = "-"
@@ -35,7 +43,7 @@ t_start = datetime.strptime(start, fmt)
 t_eind = datetime.strptime(eind, fmt)
 netto_dag_min = int((t_eind - t_start).total_seconds() / 60) - pauze
 
-# 2. Extra shift in minuten (indien aanwezig)
+# 2. Extra shift in minuten
 netto_extra_min = 0
 if start_extra and eind_extra:
     t_start_ex = datetime.strptime(start_extra, fmt)
@@ -56,13 +64,13 @@ file_exists = os.path.isfile(csv_path)
 
 header = [
     "datum", "locatie", "start", "eind", "pauze_min",
-    "start_extra", "eind_extra", "pauze_extra_min",
+    "locatie_extra", "start_extra", "eind_extra", "pauze_extra_min",
     "duur", "netto_uren", "omschrijving"
 ]
 
 row = [
     datum, locatie, start, eind, pauze,
-    start_extra, eind_extra, (pauze_extra if start_extra else ""),
+    locatie_extra, start_extra, eind_extra, (pauze_extra if start_extra else ""),
     duur, totale_netto_uren, omschrijving
 ]
 
