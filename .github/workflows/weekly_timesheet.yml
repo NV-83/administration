@@ -1,0 +1,24 @@
+name: Wekelijkse Timesheet
+
+on:
+  schedule:
+    - cron: '0 18 * * 5' # Elke vrijdag om 18:00 UTC
+  workflow_dispatch:      # Ook handmatig te starten
+
+jobs:
+  timesheet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Genereer wekelijkse timesheet
+        run: python scripts/generate_timesheet.py
+
+      - name: Bewaar overzicht als artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: timesheet-week-${{ github.run_number }}
+          path: output/
