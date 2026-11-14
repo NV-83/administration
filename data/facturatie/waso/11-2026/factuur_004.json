@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "klant_key": "waso",
+    "klant_voluit": "FOD Werkgelegenheid, Arbeid en Sociaal Overleg",
+    "periode": "11-2026",
+    "factuur_nr": "004",
+    "referentie": "NV83-2026-004",
+    "dagtarief": 650.0,
+    "btw_pct": 21.0,
+    "datum_gegenereerd": "2026-11-14T09:40:46.634785"
+  },
+  "financieel": {
+    "aantal_dagen": 4,
+    "subtotaal": 2600.0,
+    "btw_bedrag": 546.0,
+    "totaal_incl": 3146.0
+  },
+  "gefactureerde_dagen": [
+    {
+      "datum": "2026-11-09",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-10",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-12",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-13",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    }
+  ]
+}
