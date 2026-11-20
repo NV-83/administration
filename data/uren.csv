@@ -6,3 +6,4 @@ datum,locatie,start,eind,pauze_min,locatie_extra,start_extra,eind_extra,pauze_ex
 2026-11-16,Thuis,08:40,16:00,30,Thuis,20:00,21:00,0,07:50,7.83,- Release Capmeeting to ACC - Installation K3s locally + start setup vault operator chart
 2026-11-17,Kantoor,07:30,16:00,30,,,,,08:00,8.0,Installation external secret operator with connection to Vaultwarden. Setup testcase with external secret ref To test: what if vaultwarden is down.  Does applications go down?
 2026-11-18,Kantoor,7:30,15:30,15,,,,,07:45,7.75,- architecture eso  - debugging openshift access
+2026-11-19,Thuis,08:30,16:30,60,Thuis,20:00,21:30,0,08:30,8.5,- base images - images builder - ci investigation - update nginx images --> Nginx & Java CVE's
