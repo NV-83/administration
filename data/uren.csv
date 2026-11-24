@@ -9,3 +9,4 @@ datum,locatie,start,eind,pauze_min,locatie_extra,start_extra,eind_extra,pauze_ex
 2026-11-19,Thuis,08:30,16:30,60,Thuis,20:00,21:30,0,08:30,8.5,- base images - images builder - ci investigation - update nginx images --> Nginx & Java CVE's
 2026-11-20,Thuis,08:00,17:00,30,,,,,08:30,8.5,Nginx update + exploration playbook & pipelines flow.
 2026-11-23,Thuis,08:30,16:00,60,Thuis,20:00,21:30,0,08:00,8.0,- Release nginx 1.31.9 DEV - Gather all possible nginx containers - setup audit-nginx-version script
+2026-11-24,Thuis,08:15,16:30,60,Thuis,20:00,21:00,0,08:15,8.25,- Release nginx batch 1 to ACC & PROD - prepare release batch 2 & release to DEV - prepare release batch 2 ACC
