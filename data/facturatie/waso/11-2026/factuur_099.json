@@ -1,0 +1,75 @@
+{
+  "metadata": {
+    "klant_key": "waso",
+    "klant_voluit": "FOD Werkgelegenheid, Arbeid en Sociaal Overleg",
+    "periode": "11-2026",
+    "factuur_nr": "099",
+    "referentie": "NV83-2026-099",
+    "dagtarief": 650.0,
+    "btw_pct": 21.0,
+    "datum_gegenereerd": "2026-11-24T15:24:19.610345"
+  },
+  "financieel": {
+    "aantal_dagen": 11,
+    "subtotaal": 7150.0,
+    "btw_bedrag": 1501.5,
+    "totaal_incl": 8651.5
+  },
+  "gefactureerde_dagen": [
+    {
+      "datum": "2026-11-09",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-10",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-12",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-13",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-16",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-17",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-18",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-19",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-20",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-23",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    },
+    {
+      "datum": "2026-11-24",
+      "status": "Gewerkt",
+      "dagtarief": 650.0
+    }
+  ]
+}
